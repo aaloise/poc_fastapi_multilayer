@@ -37,6 +37,9 @@ export default function Header({ activeTab, onTabChange }: HeaderProps) {
               <span className="pulse-dot bg-blue-400"></span>
               <span className="text-xs text-blue-400 font-medium">uvloop</span>
             </div>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20">
+              <span className="text-xs text-purple-400 font-medium">🐦 uv</span>
+            </div>
           </div>
         </div>
 

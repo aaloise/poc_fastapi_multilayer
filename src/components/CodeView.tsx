@@ -3,8 +3,8 @@ import { useState } from 'react';
 interface CodeFile {
   name: string;
   path: string;
-  language: string;
-  layer: string;
+  icon: string;
+  description: string;
   code: string;
 }
 
@@ -12,17 +12,15 @@ const codeFiles: CodeFile[] = [
   {
     name: 'main.py',
     path: 'src/app/main.py',
-    language: 'python',
-    layer: 'Entry Point',
-    code: `"""Main Application Entry Point — 100% Async"""
+    icon: '🚀',
+    description: 'Entry point — setup e lifespan',
+    code: `"""Entry point — setup e lifespan."""
 
-from contextlib import asynccontextmanager
 import asyncio
-
-import structlog
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-# uvloop — ultra-fast event loop
+# uvloop — event loop rápido
 try:
     import uvloop
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -30,47 +28,65 @@ except ImportError:
     pass
 
 from app.config import get_settings
-from app.infrastructure import init_database, close_database, QueueManager
-from app.application import TaskService
-from app.presentation.api import router as api_router
+from app.database import init_db, close_db
+from app.queue import init_queue, stop_queue
+from app.routes import router
 
 settings = get_settings()
-logger = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Async lifespan — startup & shutdown."""
+    """Startup e shutdown."""
     # Startup
-    engine = await init_database(settings.database_url)
-    queue = QueueManager(engine, concurrency=settings.queue_concurrency)
-    await queue.setup()
-    await queue.start_worker()
-    
-    yield  # App is running
-    
+    await init_db(settings.db_url)
+    await init_queue(_engine, settings.queue_concurrency)
+    yield
     # Shutdown
-    await queue.stop_worker()
-    await close_database()
+    await stop_queue()
+    await close_db()
 
 app = FastAPI(title="Async POC", lifespan=lifespan)
-app.include_router(api_router)
-
-# Run with Granian:
-# granian --interface asgi app.main:app`,
+app.include_router(router)`,
   },
   {
-    name: 'domain/__init__.py',
-    path: 'src/app/domain/__init__.py',
-    language: 'python',
-    layer: 'Domain',
-    code: `"""Domain Layer — ZERO infrastructure dependencies."""
+    name: 'config.py',
+    path: 'src/app/config.py',
+    icon: '⚙️',
+    description: 'Settings centralizadas',
+    code: `"""Configuração centralizada."""
 
-from enum import StrEnum
-from typing import Protocol
-from pydantic import BaseModel, Field
+from functools import lru_cache
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    """Tudo em um lugar. Override via env vars (POC_*)."""
+    
+    app_name: str = "Async POC"
+    debug: bool = False
+    host: str = "0.0.0.0"
+    port: int = 8000
+    db_url: str = "sqlite+aiosqlite:///./poc.db"
+    queue_concurrency: int = 8
+    ui_prefix: str = "/ui"
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()`,
+  },
+  {
+    name: 'models.py',
+    path: 'src/app/models.py',
+    icon: '📦',
+    description: 'Domain + DB models juntos',
+    code: `"""Modelos — domain + DB em um arquivo só."""
+
 import uuid
 from datetime import datetime
+from enum import StrEnum
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+# Enums
 class TaskStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
@@ -81,307 +97,335 @@ class Priority(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
-    CRITICAL = "critical"
 
+# Domain model
 class Task(BaseModel):
-    """Core domain entity."""
+    """Task — entidade principal."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     name: str
     payload: dict = Field(default_factory=dict)
     status: TaskStatus = TaskStatus.PENDING
     priority: Priority = Priority.MEDIUM
-    queue_name: str = "default"
-    max_attempts: int = 3
     attempts: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    def mark_running(self) -> None:
-        self.status = TaskStatus.RUNNING
-        self.attempts += 1
-    
-    def mark_completed(self) -> None:
-        self.status = TaskStatus.COMPLETED
 
-class TaskRepository(Protocol):
-    """Port — infrastructure provides the adapter."""
-    async def save(self, task: Task) -> Task: ...
-    async def get_by_id(self, task_id: uuid.UUID) -> Task | None: ...
-    async def list_all(self, limit: int = 50) -> list[Task]: ...
-    async def count(self) -> int: ...`,
+# DB model
+class TaskRow(DeclarativeBase):
+    """Linha no banco."""
+    __tablename__ = "tasks"
+    id: Mapped[str] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(index=True)
+    status: Mapped[str] = mapped_column(index=True)
+    # ... outros campos
+
+# DB operations
+async def save_task(session, task: Task) -> Task:
+    """Salva task no banco."""
+    ...
+
+async def get_task(session, task_id) -> Task | None:
+    """Busca task."""
+    ...`,
   },
   {
-    name: 'application/__init__.py',
-    path: 'src/app/application/__init__.py',
-    language: 'python',
-    layer: 'Application',
-    code: `"""Application Layer — Use Cases / Orchestrators."""
+    name: 'services.py',
+    path: 'src/app/services.py',
+    icon: '⚙️',
+    description: 'Business logic',
+    code: `"""Serviços — lógica de negócio."""
 
-import time
 import uuid
-import structlog
-from app.domain import Task, TaskRepository, TaskStatus
+from datetime import datetime
+from app.database import get_session
+from app.models import Task, TaskStatus, save_task, get_task
 
-logger = structlog.get_logger()
+async def create_task(name: str, payload: dict | None = None) -> Task:
+    """Cria uma nova task."""
+    task = Task(name=name, payload=payload or {})
+    
+    session = await get_session()
+    async with session:
+        task = await save_task(session, task)
+    
+    return task
 
-class TaskService:
-    """Orchestrates task creation & execution."""
-    
-    def __init__(self, repository: TaskRepository, queue):
-        self._repo = repository
-        self._queue = queue
-    
-    async def create_task(
-        self, name: str, payload: dict | None = None
-    ) -> Task:
-        """Create + enqueue a task."""
-        task = Task(name=name, payload=payload or {})
-        task = await self._repo.save(task)
-        
-        # Enqueue via Queuefy (async, no blocking)
-        await self._queue.enqueue(
-            task_name=name,
-            task_id=str(task.id),
-            payload=task.payload,
-        )
-        
-        await logger.ainfo("task.created", task_id=str(task.id))
-        return task
-    
-    async def execute_task(self, task_id: uuid.UUID):
-        """Execute a task — called by Queuefy worker."""
-        task = await self._repo.get_by_id(task_id)
+async def execute_task(task_id: uuid.UUID) -> dict:
+    """Executa uma task (chamado pelo worker)."""
+    session = await get_session()
+    async with session:
+        task = await get_task(session, task_id)
         if not task:
-            return None
+            return {"success": False, "error": "Not found"}
         
-        task.mark_running()
-        await self._repo.save(task)
+        # Mark running
+        task.status = TaskStatus.RUNNING
+        await save_task(session, task)
         
-        # Async processing
-        result = await self._process(task)
-        task.mark_completed()
-        await self._repo.save(task)
-        
-        return result
-    
-    async def _process(self, task: Task) -> dict:
+        # Process (async work)
         import asyncio
-        await asyncio.sleep(0.1)  # Simulate I/O
-        return {"processed": True, "name": task.name}`,
+        await asyncio.sleep(0.1)
+        
+        # Mark completed
+        task.status = TaskStatus.COMPLETED
+        await save_task(session, task)
+    
+    return {"success": True, "task_id": str(task_id)}
+
+async def get_all_tasks(limit: int = 50) -> list[Task]:
+    """Lista tasks."""
+    session = await get_session()
+    async with session:
+        return await list_tasks(session, limit=limit)`,
   },
   {
-    name: 'infrastructure/queue.py',
-    path: 'src/app/infrastructure/queue.py',
-    language: 'python',
-    layer: 'Infrastructure',
-    code: `"""Infrastructure — Queuefy Integration (async task queue)."""
+    name: 'routes.py',
+    path: 'src/app/routes.py',
+    icon: '🔌',
+    description: 'FastAPI endpoints',
+    code: `"""FastAPI Routes — endpoints HTTP."""
 
-import structlog
-from sqlalchemy.ext.asyncio import AsyncEngine
+import uuid
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from app.models import Task, TaskStatus, Priority
+from app.services import create_task, get_task_by_id, get_all_tasks, get_stats
+
+router = APIRouter(prefix="/api/v1")
+
+class CreateTaskRequest(BaseModel):
+    name: str
+    payload: dict = {}
+    priority: Priority = Priority.MEDIUM
+
+@router.post("/tasks", status_code=201)
+async def create_task_endpoint(req: CreateTaskRequest):
+    """Cria task."""
+    task = await create_task(name=req.name, payload=req.payload)
+    return {"id": str(task.id), "name": task.name, "status": task.status}
+
+@router.get("/tasks")
+async def list_tasks_endpoint(limit: int = 50):
+    """Lista tasks."""
+    tasks = await get_all_tasks(limit=limit)
+    return [{"id": str(t.id), "name": t.name} for t in tasks]
+
+@router.get("/tasks/{task_id}")
+async def get_task_endpoint(task_id: uuid.UUID):
+    """Busca task."""
+    task = await get_task_by_id(task_id)
+    if not task:
+        raise HTTPException(404, "Not found")
+    return {"id": str(task.id), "name": task.name, "status": task.status}
+
+@router.get("/tasks/stats")
+async def get_stats_endpoint():
+    """Estatísticas."""
+    return await get_stats()
+
+@router.get("/health")
+async def health():
+    """Health check."""
+    return {"status": "healthy", "version": "0.1.0"}`,
+  },
+  {
+    name: 'queue.py',
+    path: 'src/app/queue.py',
+    icon: '📊',
+    description: 'Queuefy — task queue',
+    code: `"""Queuefy — fila de tarefas async."""
+
+import uuid
 from queuefy.app import Queuefy
 from queuefy.store.sqlalchemy import SqlAlchemyStore
 from queuefy.worker import Worker
 
-logger = structlog.get_logger()
+_queuefy: Queuefy | None = None
 
-class QueueManager:
-    """Wraps Queuefy for clean async interface."""
+async def init_queue(engine, concurrency: int = 8):
+    """Inicializa Queuefy."""
+    global _queuefy
+    _queuefy = Queuefy(SqlAlchemyStore(engine))
+    await _queuefy.setup()
     
-    def __init__(self, engine: AsyncEngine, concurrency: int = 8):
-        self._store = SqlAlchemyStore(engine)
-        self._app = Queuefy(self._store)
-        self._worker: Worker | None = None
-        self._concurrency = concurrency
+    # Registra handlers
+    @_queuefy.task("process_task", max_attempts=3)
+    async def handle_task(task_id: str, payload: dict):
+        from app.services import execute_task
+        return await execute_task(uuid.UUID(task_id))
     
-    async def setup(self) -> None:
-        """Initialize Queuefy tables."""
-        await self._app.setup()
-        self._register_handlers()
-    
-    def _register_handlers(self) -> None:
-        @self._app.task("process_task", max_attempts=3, timeout=60)
-        async def handle_task(task_id: str, payload: dict):
-            from app.dependencies import get_task_service
-            service = await get_task_service()
-            return await service.execute_task(uuid.UUID(task_id))
-        
-        @self._app.task("nightly_report", cron="0 4 * * *")
-        async def handle_report():
-            # Scheduled task — runs at 4 AM daily
-            ...
-    
-    async def enqueue(self, task_name: str, **kwargs) -> str:
-        """Enqueue a task for async execution."""
-        await self._app.enqueue(task_name, **kwargs)
-        return kwargs.get("task_id", "")
-    
-    async def start_worker(self) -> None:
-        """Start background worker."""
-        import asyncio
-        self._worker = Worker(self._app, concurrency=self._concurrency)
-        asyncio.create_task(self._worker.run())`,
+    # Inicia worker em background
+    import asyncio
+    worker = Worker(_queuefy, concurrency=concurrency)
+    asyncio.create_task(worker.run())
+
+async def enqueue(task_name: str, **kwargs) -> str:
+    """Enfileira uma task."""
+    tid = kwargs.get("task_id") or str(uuid.uuid4())
+    await _queuefy.enqueue(task_name, task_id=tid, **kwargs)
+    return tid`,
   },
   {
-    name: 'infrastructure/prefect_flows.py',
-    path: 'src/app/infrastructure/prefect_flows.py',
-    language: 'python',
-    layer: 'Infrastructure',
-    code: `"""Infrastructure — Prefect Flows (optional orchestration)."""
+    name: 'flows.py',
+    path: 'src/app/flows.py',
+    icon: '🔮',
+    description: 'Prefect flows (opcional)',
+    code: `"""Prefect Flows — orquestração (opcional)."""
 
 import asyncio
 from datetime import datetime
 
 try:
-    from prefect import flow, task as prefect_task, get_run_logger
-    PREFECT_AVAILABLE = True
+    from prefect import flow, task, get_run_logger
+    PREFECT_OK = True
 except ImportError:
-    PREFECT_AVAILABLE = False
+    PREFECT_OK = False
 
-if PREFECT_AVAILABLE:
-    
-    @prefect_task(retries=3, retry_delay_seconds=10)
-    async def fetch_external_data(source: str) -> dict:
-        """Fetch data from external source."""
-        log = get_run_logger()
-        log.info(f"Fetching from {source}")
+if PREFECT_OK:
+    @task(retries=3)
+    async def fetch_data(source: str) -> dict:
+        """Busca dados."""
         await asyncio.sleep(0.5)
         return {"source": source, "records": 100}
     
-    @prefect_task(retries=2)
-    async def transform_data(raw: dict) -> dict:
-        """Transform raw data."""
+    @task
+    async def transform(data: dict) -> dict:
+        """Transforma dados."""
         await asyncio.sleep(0.2)
-        return {"transformed": True, "count": raw["records"]}
+        return {"transformed": True, "count": data["records"]}
     
     @flow(name="data-pipeline")
-    async def data_pipeline_flow(source: str = "api") -> dict:
-        """Complete ETL pipeline."""
+    async def data_pipeline(source: str = "api") -> dict:
+        """Pipeline ETL completo."""
         log = get_run_logger()
-        log.info(f"Starting pipeline: {source}")
+        log.info(f"Pipeline: {source}")
         
-        raw = await fetch_external_data(source)
-        transformed = await transform_data(raw)
+        raw = await fetch_data(source)
+        result = await transform(raw)
         
-        return {"status": "complete", "data": transformed}`,
+        return result
+
+else:
+    async def data_pipeline(source: str = "api") -> dict:
+        return {"error": "Prefect not installed"}`,
   },
   {
-    name: 'presentation/ui.py',
-    path: 'src/app/presentation/ui.py',
-    language: 'python',
-    layer: 'Presentation',
-    code: `"""Presentation — NiceGUI Pages (mounted on FastAPI)."""
+    name: 'database.py',
+    path: 'src/app/database.py',
+    icon: '🗄️',
+    description: 'DB setup',
+    code: `"""Database — setup e session."""
+
+from sqlalchemy.ext.asyncio import (
+    AsyncSession, async_sessionmaker, create_async_engine
+)
+from app.models import Base
+
+_engine = None
+_session_factory = None
+
+async def init_db(url: str):
+    """Inicializa o banco."""
+    global _engine, _session_factory
+    
+    _engine = create_async_engine(url)
+    _session_factory = async_sessionmaker(
+        _engine, class_=AsyncSession, expire_on_commit=False
+    )
+    
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+async def get_session() -> AsyncSession:
+    """Retorna session."""
+    return _session_factory()
+
+async def close_db():
+    """Fecha engine."""
+    global _engine
+    if _engine:
+        await _engine.dispose()`,
+  },
+  {
+    name: 'ui.py',
+    path: 'src/app/ui.py',
+    icon: '🎨',
+    description: 'NiceGUI pages',
+    code: `"""NiceGUI — Dashboard interativo."""
 
 from nicegui import ui
-from datetime import datetime
 
-def setup_nicegui_pages(prefix: str = "/ui") -> None:
+def setup_ui(prefix: str = "/ui"):
+    """Registra páginas."""
     
     @ui.page(f"{prefix}/")
     async def dashboard():
         ui.dark_mode().enable()
         
         with ui.header().classes("bg-gray-900 text-white"):
-            ui.label("⚡ Async POC Dashboard").classes("text-xl")
+            ui.label("⚡ Async POC").classes("text-xl")
         
-        # Stats cards
+        # Stats
         with ui.row().classes("w-full gap-4 p-4"):
             with ui.card().classes("flex-1"):
-                ui.label("📊 Tasks").classes("text-lg font-bold")
+                ui.label("📊 Tasks")
                 stats = ui.label("Loading...")
-            
-            with ui.card().classes("flex-1"):
-                ui.label("⚡ Queue").classes("text-lg font-bold")
-                queue = ui.label("Active")
         
-        # Task creation
+        # Create task
         with ui.card().classes("w-full p-4"):
-            ui.label("🚀 Create Task").classes("text-lg")
+            ui.label("🚀 Create Task")
             name = ui.input("Name", value="demo")
             ui.button("Create", on_click=create_action)
         
-        # Auto-refresh
-        ui.timer(5.0, lambda: refresh(stats))
-    
-    @ui.page(f"{prefix}/architecture")
-    async def architecture():
-        ui.label("🏗️ Architecture Overview")
-        # ... layer visualization`,
+        # Task list
+        table = ui.table(columns=[...], rows=[])
+        
+        async def refresh():
+            # Fetch from API
+            ...`,
   },
   {
-    name: 'config.py',
-    path: 'src/app/config.py',
-    language: 'python',
-    layer: 'Configuration',
-    code: `"""Application settings — pydantic-settings."""
+    name: 'pyproject.toml',
+    path: 'pyproject.toml',
+    icon: '📋',
+    description: 'uv + dependências',
+    code: `[project]
+name = "async-poc"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "uvloop>=0.20.0",
+    "granian[uvloop]>=1.6.0",
+    "nicegui>=2.0",
+    "queuefy[sqlalchemy]>=1.0.3",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20.0",
+    "prefect>=3.0",
+    "httpx>=0.27",
+    "structlog>=24.0",
+]
 
-from functools import lru_cache
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_prefix="POC_",
-    )
-    
-    # App
-    app_name: str = "Async POC"
-    debug: bool = False
-    
-    # Server
-    host: str = "0.0.0.0"
-    port: int = 8000
-    workers: int = 4
-    
-    # Database (async)
-    database_url: str = "sqlite+aiosqlite:///./poc.db"
-    
-    # Queuefy
-    queue_concurrency: int = 8
-    
-    # Prefect
-    prefect_enabled: bool = True
-    
-    # NiceGUI
-    nicegui_prefix: str = "/ui"
-
-@lru_cache(maxsize=1)
-def get_settings() -> Settings:
-    return Settings()`,
-  },
-  {
-    name: 'granian.toml',
-    path: 'granian.toml',
-    language: 'toml',
-    layer: 'Server Config',
-    code: `# Granian ASGI Server (Rust-based)
-# Docs: github.com/emmett-framework/granian
-
-address = "0.0.0.0"
-port = 8000
-interface = "asgi"
-http = "auto"
-workers = 4
-threads = 2
-backpressure = 1024
-enable-websocket = true
-log-level = "info"
-graceful-timeout = 30
-respawn-failed-workers = true
-
-# uvloop is auto-detected if installed
-# pip install "granian[uvloop]"`,
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]`,
   },
 ];
 
 export default function CodeView() {
   const [selectedFile, setSelectedFile] = useState(0);
-
   const file = codeFiles[selectedFile];
 
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-3xl font-bold gradient-text mb-2">Código-Fonte</h2>
-        <p className="text-slate-400">Estrutura completa da POC com separação em camadas</p>
+        <p className="text-slate-400">9 arquivos — simples e direto</p>
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6">
@@ -401,18 +445,10 @@ export default function CodeView() {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-base">
-                      {f.layer === 'Domain' && '🧱'}
-                      {f.layer === 'Application' && '⚙️'}
-                      {f.layer === 'Infrastructure' && '🔧'}
-                      {f.layer === 'Presentation' && '📡'}
-                      {f.layer === 'Entry Point' && '🚀'}
-                      {f.layer === 'Configuration' && '⚙️'}
-                      {f.layer === 'Server Config' && '🦀'}
-                    </span>
+                    <span className="text-base">{f.icon}</span>
                     <span className="truncate">{f.name}</span>
                   </div>
-                  <span className="text-xs text-slate-500 ml-6">{f.layer}</span>
+                  <span className="text-xs text-slate-500 ml-6">{f.description}</span>
                 </button>
               ))}
             </div>
@@ -422,7 +458,6 @@ export default function CodeView() {
         {/* Code display */}
         <div className="lg:col-span-3">
           <div className="glass-card overflow-hidden">
-            {/* File header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50 bg-slate-800/50">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1.5">
@@ -432,16 +467,15 @@ export default function CodeView() {
                 </div>
                 <span className="text-sm text-slate-400 font-mono">{file.path}</span>
               </div>
-              <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300">{file.language}</span>
+              <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300">{file.icon} {file.name}</span>
             </div>
 
-            {/* Code content */}
             <pre className="p-4 overflow-x-auto text-sm leading-relaxed">
               <code className="text-slate-300">
                 {file.code.split('\n').map((line, idx) => (
                   <div key={idx} className="flex">
                     <span className="text-slate-600 select-none w-8 text-right mr-4 shrink-0">{idx + 1}</span>
-                    <span className="whitespace-pre">{highlightPython(line)}</span>
+                    <span className="whitespace-pre">{line}</span>
                   </div>
                 ))}
               </code>
@@ -450,48 +484,5 @@ export default function CodeView() {
         </div>
       </div>
     </div>
-  );
-}
-
-// Simple syntax highlighting
-function highlightPython(line: string): JSX.Element {
-  // Keywords
-  const keywords = /\b(async|await|def|class|from|import|return|if|else|try|except|with|as|None|True|False|self|raise|yield)\b/g;
-  const strings = /(["'])(?:(?=(\\?))\2.)*?\1/g;
-  const comments = /#.*/g;
-  const decorators = /@\w+/g;
-  const functions = /\b(\w+)\s*\(/g;
-
-  // Simple approach: just return the line as-is with basic coloring
-  // For a real app, use a proper syntax highlighter
-  const parts: JSX.Element[] = [];
-  let remaining = line;
-  let key = 0;
-
-  // Comment
-  if (remaining.trimStart().startsWith('#') || remaining.trimStart().startsWith('"""')) {
-    return <span key={key} className="text-slate-500 italic">{line}</span>;
-  }
-
-  // Decorator
-  if (remaining.trimStart().startsWith('@')) {
-    return <span key={key} className="text-purple-400">{line}</span>;
-  }
-
-  // Basic keyword highlighting
-  const segments = remaining.split(/(\b(?:async|await|def|class|from|import|return|if|else|try|except|with|as|None|True|False|self|raise|yield|for|in|not|and|or|is)\b)/g);
-  
-  return (
-    <span>
-      {segments.map((seg, i) => {
-        if (/^(async|await|def|class|from|import|return|if|else|try|except|with|as|None|True|False|self|raise|yield|for|in|not|and|or|is)$/.test(seg)) {
-          return <span key={i} className="text-blue-400">{seg}</span>;
-        }
-        if (/^["']/.test(seg)) {
-          return <span key={i} className="text-green-400">{seg}</span>;
-        }
-        return <span key={i}>{seg}</span>;
-      })}
-    </span>
   );
 }

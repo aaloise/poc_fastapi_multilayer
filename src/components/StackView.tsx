@@ -136,19 +136,23 @@ export default function StackView() {
       {/* Install command */}
       <div className="glass-card p-6">
         <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
-          <span>📥</span> Instalação
+          <span>📥</span> Instalação (com uv)
         </h3>
         <div className="code-block">
           <code className="text-green-400">
+            <span className="text-slate-500"># Instale uv (se não tiver)</span>{'\n'}
+            <span className="text-cyan-400">curl</span>
+            <span className="text-slate-300"> -LsSf https://astral.sh/uv/install.sh | sh</span>{'\n\n'}
             <span className="text-slate-500"># Clone e instale</span>{'\n'}
             <span className="text-slate-300">cd backend</span>{'\n'}
-            <span className="text-slate-300">pip install -e ".[dev]"</span>{'\n\n'}
+            <span className="text-cyan-400">uv</span>
+            <span className="text-slate-300"> sync</span>{'\n\n'}
             <span className="text-slate-500"># Execute com Granian (produção)</span>{'\n'}
-            <span className="text-cyan-400">granian</span>
-            <span className="text-slate-300"> --interface asgi --config granian.toml app.main:app</span>{'\n\n'}
-            <span className="text-slate-500"># Ou com uvicorn (desenvolvimento)</span>{'\n'}
-            <span className="text-cyan-400">python</span>
-            <span className="text-slate-300"> -m app.main</span>
+            <span className="text-cyan-400">uv</span>
+            <span className="text-slate-300"> run granian --interface asgi --config granian.toml app.main:app</span>{'\n\n'}
+            <span className="text-slate-500"># Ou desenvolvimento</span>{'\n'}
+            <span className="text-cyan-400">uv</span>
+            <span className="text-slate-300"> run python -m app.main</span>
           </code>
         </div>
       </div>

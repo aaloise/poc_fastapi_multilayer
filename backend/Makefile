@@ -1,35 +1,35 @@
-.PHONY: install dev run granian test lint format clean docker-build docker-up
+.PHONY: install dev granian test lint format clean docker-build docker-up
 
-# Install dependencies
+# Install (uv)
 install:
-	pip install -e "."
+	uv sync
 
 install-dev:
-	pip install -e ".[dev]"
+	uv sync --dev
 
 # Development
 dev:
-	python -m app.main
+	uv run python -m app.main
 
 # Production with Granian
 granian:
-	granian --interface asgi --config granian.toml app.main:app
+	uv run granian --interface asgi --config granian.toml app.main:app
 
 # Testing
 test:
-	pytest tests/ -v --asyncio-mode=auto
+	uv run pytest tests/ -v --asyncio-mode=auto
 
 test-cov:
-	pytest tests/ -v --asyncio-mode=auto --cov=src/app --cov-report=term-missing
+	uv run pytest tests/ -v --asyncio-mode=auto --cov=src/app --cov-report=term-missing
 
 # Linting
 lint:
-	ruff check src/ tests/
-	mypy src/
+	uv run ruff check src/ tests/
+	uv run mypy src/
 
 format:
-	ruff format src/ tests/
-	ruff check --fix src/ tests/
+	uv run ruff format src/ tests/
+	uv run ruff check --fix src/ tests/
 
 # Clean
 clean:
@@ -49,7 +49,4 @@ docker-down:
 
 # Prefect (optional)
 prefect-server:
-	prefect server start
-
-prefect-flow:
-	python -c "from app.infrastructure.prefect_flows import data_pipeline_flow; import asyncio; asyncio.run(data_pipeline_flow())"
+	uv run prefect server start

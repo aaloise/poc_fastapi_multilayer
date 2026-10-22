@@ -1,69 +1,66 @@
-# Async POC — FastAPI + uvloop + Granian + Prefect + Queuefy + NiceGUI
+# Async POC — FastAPI + Granian + Queuefy + NiceGUI
 
-POC com arquitetura em camadas, 100% async.
+POC 100% async com estrutura simples e direta.
 
-## 🏗️ Arquitetura
+## 📁 Estrutura (Flat & Simple)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    PRESENTATION LAYER                        │
-│  ┌──────────────────────┐  ┌──────────────────────────────┐ │
-│  │   FastAPI REST API   │  │     NiceGUI (UI Pages)       │ │
-│  │   /api/v1/*          │  │     /ui/*                    │ │
-│  └──────────┬───────────┘  └──────────────┬───────────────┘ │
-├─────────────┼──────────────────────────────┼────────────────┤
-│             │     APPLICATION LAYER        │                │
-│  ┌──────────▼──────────────────────────────▼───────────────┐ │
-│  │              TaskService (Use Cases)                     │ │
-│  │   create_task() │ execute_task() │ list_tasks()         │ │
-│  └──────────┬──────────────────────────────┬───────────────┘ │
-├─────────────┼──────────────────────────────┼────────────────┤
-│             │        DOMAIN LAYER          │                │
-│  ┌──────────▼──────────┐  ┌───────────────▼──────────────┐  │
-│  │  Entities & VOs     │  │   Repository Ports (Protocol)│  │
-│  │  Task, TaskResult   │  │   TaskRepository             │  │
-│  │  TaskStatus, ...    │  │                              │  │
-│  └─────────────────────┘  └───────────────┬──────────────┘  │
-├────────────────────────────────────────────┼────────────────┤
-│              INFRASTRUCTURE LAYER          │                │
-│  ┌──────────────┐ ┌──────────┐ ┌─────────▼──────────────┐  │
-│  │ SQLAlchemy   │ │ Queuefy  │ │    Prefect Flows       │  │
-│  │ (async DB)   │ │ (Queue)  │ │    (Orchestration)     │  │
-│  └──────────────┘ └──────────┘ └────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-
-Server: Granian (Rust) + uvloop (async event loop)
+backend/
+├── pyproject.toml      # uv + dependências
+├── granian.toml        # Config do servidor
+├── Makefile            # Comandos úteis
+├── Dockerfile          # Container
+├── docker-compose.yml  # Stack completa
+│
+└── src/app/
+    ├── main.py         # Entry point + lifespan
+    ├── config.py       # Settings (pydantic)
+    ├── models.py       # Domain + DB models (juntos)
+    ├── services.py     # Business logic
+    ├── routes.py       # FastAPI routes
+    ├── ui.py           # NiceGUI pages
+    ├── queue.py        # Queuefy integration
+    ├── flows.py        # Prefect flows
+    └── database.py     # DB setup
 ```
 
-## 🚀 Como Executar
+**Sem camadas desnecessárias.** Tudo flat, direto ao ponto.
 
-### Instalação
+## 🚀 Como Rodar
+
+### Com uv (recomendado)
 
 ```bash
 cd backend
-pip install -e ".[dev]"
+
+# Instala dependências
+uv sync
+
+# Desenvolvimento
+uv run python -m app.main
+
+# Produção (Granian + uvloop)
+uv run granian --interface asgi --config granian.toml app.main:app
 ```
 
-### Desenvolvimento
+### Com pip (fallback)
 
 ```bash
-# Com uvicorn (dev)
+pip install -e .
 python -m app.main
-
-# Com Granian (produção)
-granian --interface asgi --config granian.toml app.main:app
-
-# Ou diretamente
-python -m app.main --granian
 ```
 
-### Endpoints
+### Docker
 
-- **API REST**: http://localhost:8000/api/v1/
-- **NiceGUI Dashboard**: http://localhost:8000/ui/
-- **Arquitetura**: http://localhost:8000/ui/architecture
-- **Monitor**: http://localhost:8000/ui/monitor
-- **Swagger Docs**: http://localhost:8000/docs
+```bash
+docker-compose up -d
+```
+
+## 🌐 Endpoints
+
+- **API**: http://localhost:8000/api/v1/
+- **Dashboard**: http://localhost:8000/ui/
+- **Docs**: http://localhost:8000/docs
 
 ## 📦 Stack
 
@@ -72,24 +69,42 @@ python -m app.main --granian
 | **FastAPI** | Framework HTTP async |
 | **uvloop** | Event loop ultra-rápido |
 | **Granian** | Servidor ASGI em Rust |
-| **Queuefy** | Fila de tarefas async (sem broker) |
-| **Prefect** | Orquestração de workflows |
-| **NiceGUI** | UI interativa (montada no FastAPI) |
-| **SQLAlchemy 2** | ORM async |
-| **aiosqlite** | Driver SQLite async |
+| **Queuefy** | Fila async (sem broker) |
+| **Prefect** | Orquestração (opcional) |
+| **NiceGUI** | UI interativa |
+| **SQLAlchemy** | ORM async |
 
-## 📁 Estrutura
+## 🔄 Fluxo Simples
 
 ```
-backend/
-├── pyproject.toml          # Dependências
-├── granian.toml            # Config do Granian
-├── src/app/
-│   ├── main.py             # Entry point + lifespan
-│   ├── config.py           # Settings (pydantic-settings)
-│   ├── dependencies.py     # DI wiring
-│   ├── domain/             # Entidades & ports
-│   ├── application/        # Use cases
-│   ├── infrastructure/     # DB, Queuefy, Prefect
-│   └── presentation/       # API routes + NiceGUI
+HTTP Request
+    ↓
+Granian (Rust) + uvloop
+    ↓
+FastAPI Router
+    ↓
+Service (business logic)
+    ↓
+DB (SQLAlchemy async) / Queue (Queuefy)
+    ↓
+Worker (background)
+    ↓
+Response
+```
+
+## 🧪 Testes
+
+```bash
+uv run pytest tests/ -v
+```
+
+## 📝 Comandos (Makefile)
+
+```bash
+make install      # uv sync
+make dev          # Rodar em dev
+make granian      # Rodar com Granian
+make test         # Testes
+make lint         # Linting
+make docker-up    # Docker
 ```

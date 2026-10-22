@@ -177,24 +177,25 @@ export default function EndpointsView() {
         </h3>
         <div className="grid md:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
-            <p className="text-sm font-medium text-orange-400 mb-2">🦀 Granian (Produção)</p>
+            <p className="text-sm font-medium text-orange-400 mb-2">🦀 Granian + uv</p>
             <code className="text-xs text-slate-300 block bg-slate-900/50 p-2 rounded">
-              granian --interface asgi \<br/>
-              &nbsp;&nbsp;--config granian.toml \<br/>
+              uv sync<br/>
+              uv run granian \<br/>
+              &nbsp;&nbsp;--interface asgi \<br/>
               &nbsp;&nbsp;app.main:app
             </code>
           </div>
           <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
-            <p className="text-sm font-medium text-blue-400 mb-2">⚡ Uvicorn (Dev)</p>
+            <p className="text-sm font-medium text-blue-400 mb-2">⚡ Dev (uv)</p>
             <code className="text-xs text-slate-300 block bg-slate-900/50 p-2 rounded">
-              python -m app.main
+              uv run python \<br/>
+              &nbsp;&nbsp;-m app.main
             </code>
           </div>
           <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
             <p className="text-sm font-medium text-green-400 mb-2">🐳 Docker</p>
             <code className="text-xs text-slate-300 block bg-slate-900/50 p-2 rounded">
-              docker build -t poc .<br/>
-              docker run -p 8000:8000 poc
+              docker-compose up -d
             </code>
           </div>
         </div>
