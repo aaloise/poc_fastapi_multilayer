@@ -8,6 +8,7 @@ interface HeaderProps {
 const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'architecture', label: 'Arquitetura', icon: '🏗️' },
   { id: 'code', label: 'Código', icon: '💻' },
+  { id: 'queuefy', label: 'Queuefy', icon: '📊' },
   { id: 'stack', label: 'Stack', icon: '📦' },
   { id: 'endpoints', label: 'Endpoints', icon: '🔌' },
 ];

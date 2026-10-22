@@ -4,8 +4,9 @@ import ArchitectureView from './components/ArchitectureView';
 import CodeView from './components/CodeView';
 import StackView from './components/StackView';
 import EndpointsView from './components/EndpointsView';
+import QueuefyView from './components/QueuefyView';
 
-type Tab = 'architecture' | 'code' | 'stack' | 'endpoints';
+type Tab = 'architecture' | 'code' | 'stack' | 'endpoints' | 'queuefy';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('architecture');
@@ -20,11 +21,12 @@ function App() {
           {activeTab === 'code' && <CodeView />}
           {activeTab === 'stack' && <StackView />}
           {activeTab === 'endpoints' && <EndpointsView />}
+          {activeTab === 'queuefy' && <QueuefyView />}
         </div>
       </main>
 
       <footer className="border-t border-slate-800 py-4 text-center text-slate-500 text-sm">
-        <p>Async POC — FastAPI + uvloop + Granian + Prefect + Queuefy + NiceGUI — 100% Async, Layered Architecture</p>
+        <p>Async POC — FastAPI + uvloop + Granian + Prefect + Queuefy + NiceGUI — 100% Async, Flat Structure</p>
       </footer>
     </div>
   );

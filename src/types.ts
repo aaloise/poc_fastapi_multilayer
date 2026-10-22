@@ -1,4 +1,4 @@
-export type Tab = 'architecture' | 'code' | 'stack' | 'endpoints';
+export type Tab = 'architecture' | 'code' | 'stack' | 'endpoints' | 'queuefy';
 
 export interface Layer {
   name: string;
