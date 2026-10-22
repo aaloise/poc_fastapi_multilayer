@@ -1,0 +1,35 @@
+[project]
+name = "async-poc"
+version = "0.1.0"
+description = "POC: FastAPI + uvloop + Granian + Prefect + Queuefy + NiceGUI — 100% Async, Layered Architecture"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "uvloop>=0.20.0",
+    "granian[uvloop]>=1.6.0",
+    "nicegui>=2.0",
+    "queuefy[sqlalchemy]>=1.0.3",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20.0",
+    "prefect>=3.0",
+    "httpx>=0.27",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+redis = ["queuefy[redis]>=1.0.3"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
