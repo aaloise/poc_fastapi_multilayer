@@ -1,13 +1,29 @@
-"""Entry point — setup e lifespan."""
+"""
+Async POC - FastAPI + Queuefy + NiceGUI
+========================================
+
+Ponto de entrada único para a aplicação.
+Inicia API REST + Dashboard NiceGUI + Queue Worker.
+
+Uso:
+    uv run python -m app.main
+"""
 
 import asyncio
-import sys
 import platform
 from contextlib import asynccontextmanager
 
-import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from nicegui import ui, app as nicegui_app
+import structlog
+
+from app.config import get_settings
+from app.database import init_db, close_db
+from app.queue import init_queue, stop_queue
+from app.routes import router
+from app.ui import setup_ui
 
 # uvloop - não funciona no Windows
 UVLOOP = False
@@ -19,70 +35,80 @@ if platform.system() != "Windows":
     except ImportError:
         pass
 
-from app.config import get_settings
-from app.database import init_db, close_db
-from app.queue import init_queue, stop_queue
-from app.routes import router
-
 settings = get_settings()
 logger = structlog.get_logger()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup e shutdown."""
-    await logger.ainfo("starting", uvloop=UVLOOP, environment=settings.environment)
-
+    """Gerencia ciclo de vida: startup e shutdown."""
     # Startup
+    await logger.ainfo("starting", uvloop=UVLOOP, environment=settings.environment)
+    
     await init_db(settings.db_url)
     await logger.ainfo("database.ready", url=settings.db_url)
-
-    # Queuefy precisa do engine — vamos pegar do database module
+    
     from app.database import _engine
     await init_queue(_engine, settings.queue_concurrency)
     await logger.ainfo("queue.ready")
-
-    await logger.ainfo("started", host=settings.host, port=settings.port, environment=settings.environment)
+    
+    await logger.ainfo("started", host=settings.host, port=settings.port)
+    
     yield
-
+    
     # Shutdown
     await stop_queue()
     await close_db()
     await logger.ainfo("stopped")
 
 
-# FastAPI app
-app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-app.include_router(router)
-
-# Rota raiz - informações da API
-@app.get("/")
-async def root():
-    """Informações da API."""
-    return {
-        "name": settings.app_name,
-        "version": "0.1.0",
-        "docs": "/docs",
-        "api": "/api/v1/",
-        "dashboard": "Execute: uv run python -m app.main_with_ui",
-    }
+# Configura NiceGUI app
+nicegui_app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+nicegui_app.include_router(router)
 
 
-if __name__ == "__main__":
-    # Verifica argumento --env
-    if "--env" in sys.argv:
-        env_index = sys.argv.index("--env")
-        if env_index + 1 < len(sys.argv):
-            import os
-            os.environ["POC_ENV"] = sys.argv[env_index + 1]
-            # Recarrega settings
-            from app.config import get_settings
-            settings = get_settings()
+@nicegui_app.on_event("startup")
+async def startup():
+    """Inicializa banco e queue."""
+    await logger.ainfo("starting", uvloop=UVLOOP, environment=settings.environment)
     
-    if "--granian" in sys.argv:
-        from granian import Granian
-        Granian("app.main:app", address=settings.host, port=settings.port, interface="asgi", workers=settings.workers).serve()
-    else:
-        import uvicorn
-        uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=settings.debug, loop="uvloop" if UVLOOP else "asyncio")
+    await init_db(settings.db_url)
+    await logger.ainfo("database.ready", url=settings.db_url)
+    
+    from app.database import _engine
+    await init_queue(_engine, settings.queue_concurrency)
+    await logger.ainfo("queue.ready")
+    
+    await logger.ainfo("started", host=settings.host, port=settings.port)
+
+
+@nicegui_app.on_event("shutdown")
+async def shutdown():
+    """Finaliza banco e queue."""
+    await stop_queue()
+    await close_db()
+    await logger.ainfo("stopped")
+
+
+# Rota raiz - redireciona para dashboard
+@nicegui_app.get("/")
+async def root():
+    """Redireciona para o dashboard."""
+    return RedirectResponse(url="/ui/")
+
+
+# Configura páginas NiceGUI
+setup_ui(settings.ui_prefix)
+
+logger.info("nicegui.pages.registered", prefix=settings.ui_prefix)
+
+# Inicia servidor
+logger.info("nicegui.starting", prefix=settings.ui_prefix)
+
+ui.run(
+    title=settings.app_name,
+    host=settings.host,
+    port=settings.port,
+    reload=settings.debug,
+    show=False,
+)
