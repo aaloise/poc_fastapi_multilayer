@@ -5,7 +5,7 @@ POC com FastAPI + Queuefy + NiceGUI. Tudo async, arquitetura em camadas.
 ## 🚀 Comece Aqui
 
 **Primeiro:** [GUIA_RAPIDO.md](GUIA_RAPIDO.md) - Como executar  
-**Depois:** [MODOS.md](MODOS.md) - Escolha o modo de execução
+**Entenda:** [docs/ARQUITETURA_CORRETA.md](docs/ARQUITETURA_CORRETA.md) - Como funciona
 
 ## Resumo Rápido
 
@@ -18,16 +18,14 @@ uv sync
 # 2. Popular banco
 uv run python scripts/seed_data.py
 
-# 3. Iniciar (escolha um modo)
-uv run python -m app.main              # API pura
-# OU
-uv run python -m app.main_with_ui      # API + Dashboard NiceGUI
+# 3. Iniciar
+uv run python -m app.main
 ```
 
 **Acesse:**
+- Dashboard: http://localhost:8000/ui/
 - API: http://localhost:8000/api/v1/
 - Docs: http://localhost:8000/docs
-- Dashboard (se usar main_with_ui): http://localhost:8000/ui/
 
 ## 🧪 Testar
 

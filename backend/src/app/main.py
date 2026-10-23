@@ -1,9 +1,14 @@
 """
-Async POC - API REST (sem UI)
-==============================
+Async POC - FastAPI + Queuefy + NiceGUI
+========================================
 
-Entry point para API REST pura (sem NiceGUI).
-Use este arquivo quando quiser apenas a API.
+Entry point único que inicia:
+- API REST (FastAPI)
+- Dashboard (NiceGUI)
+- Task Queue (Queuefy)
+- Database (SQLAlchemy)
+
+Todos compartilham os mesmos services, sem HTTP entre eles.
 
 Uso:
     uv run python -m app.main
@@ -15,12 +20,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from nicegui import ui, app as nicegui_app
 import structlog
 
 from app.config import get_settings
 from app.database import init_db, close_db
 from app.queue import init_queue, stop_queue
 from app.routes import router
+from app.ui import setup_ui
 
 # uvloop - não funciona no Windows
 UVLOOP = False
@@ -59,44 +67,39 @@ async def lifespan(app: FastAPI):
     await logger.ainfo("stopped")
 
 
-# Cria FastAPI app
-app = FastAPI(
-    title=settings.app_name,
-    version="0.1.0",
-    lifespan=lifespan
-)
-
-# Middleware
-app.add_middleware(
+# Configura NiceGUI app
+nicegui_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"]
 )
 
-# Rotas da API
-app.include_router(router)
+# Adiciona rotas da API ao NiceGUI
+nicegui_app.include_router(router)
+
+# Configura lifespan do NiceGUI
+nicegui_app.router.lifespan_context = lifespan
 
 
-# Rota raiz
-@app.get("/")
+# Rota raiz - redireciona para dashboard
+@nicegui_app.get("/")
 async def root():
-    """Informações da API."""
-    return {
-        "name": settings.app_name,
-        "version": "0.1.0",
-        "docs": "/docs",
-        "api": "/api/v1/",
-        "dashboard": "Execute: uv run python -m app.main_with_ui",
-    }
+    """Redireciona para o dashboard."""
+    return RedirectResponse(url="/ui/")
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
-        loop="uvloop" if UVLOOP else "asyncio",
-    )
+# Configura páginas NiceGUI
+setup_ui(settings.ui_prefix)
+
+logger.info("nicegui.pages.registered", prefix=settings.ui_prefix)
+logger.info("nicegui.starting", prefix=settings.ui_prefix)
+
+# Inicia servidor NiceGUI (com FastAPI integrado)
+ui.run(
+    title=settings.app_name,
+    host=settings.host,
+    port=settings.port,
+    reload=settings.debug,
+    show=False,
+)

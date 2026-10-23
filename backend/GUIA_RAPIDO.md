@@ -19,16 +19,8 @@ Isso cria 10 tasks de exemplo no banco SQLite.
 
 ### 3. Iniciar aplicação
 
-**Escolha um modo:**
-
-#### Opção A: API Pura (Recomendado)
 ```bash
 uv run python -m app.main
-```
-
-#### Opção B: API + Dashboard NiceGUI
-```bash
-uv run python -m app.main_with_ui
 ```
 
 Você verá:
@@ -37,17 +29,18 @@ INFO:     Uvicorn running on http://127.0.0.1:8000
 INFO:     database.ready url=sqlite+aiosqlite:///./dev_poc.db
 INFO:     queuefy.started concurrency=4
 INFO:     queue.ready
+INFO:     nicegui.pages.registered prefix=/ui
 INFO:     started host=127.0.0.1 port=8000
 ```
 
 ### 4. Acessar
 
 Abra no navegador:
+- **Dashboard**: http://localhost:8000/ui/
 - **API**: http://localhost:8000/api/v1/tasks
 - **Docs**: http://localhost:8000/docs
-- **Dashboard** (apenas com main_with_ui): http://localhost:8000/ui/
 
-📖 **Leia [MODOS.md](MODOS.md) para entender a diferença**
+📖 **Leia [docs/ARQUITETURA_CORRETA.md](docs/ARQUITETURA_CORRETA.md) para entender como funciona**
 
 ### 5. Testar (em outro terminal)
 
