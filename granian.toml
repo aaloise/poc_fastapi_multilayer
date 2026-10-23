@@ -1,0 +1,28 @@
+# Granian ASGI Server Configuration
+# Docs: https://github.com/emmett-framework/granian
+
+address = "0.0.0.0"
+port = 8000
+interface = "asgi"
+http = "auto"
+workers = 4
+threads = 2
+blocking-threads = 0
+backpressure = 1024
+http-buffer-size = 65535
+enable-websocket = true
+
+# Logging
+log-level = "info"
+log-dict-config = ""
+
+# SSL (uncomment for production)
+# ssl-certificate = "/path/to/cert.pem"
+# ssl-keyfile = "/path/to/key.pem"
+
+# Graceful shutdown
+graceful-timeout = 30
+
+# Process management
+respawn-failed-workers = true
+respawn-interval = 3.5
