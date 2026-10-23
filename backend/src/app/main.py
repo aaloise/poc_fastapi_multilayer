@@ -42,20 +42,6 @@ async def lifespan(app: FastAPI):
     await init_queue(_engine, settings.queue_concurrency)
     await logger.ainfo("queue.ready")
 
-    # NiceGUI
-    try:
-        from nicegui import ui
-        from app.ui import setup_ui
-        from scripts.test_dashboard import setup_test_dashboard
-        
-        setup_ui(settings.ui_prefix)
-        setup_test_dashboard()
-        
-        ui.run(title=settings.app_name, port=settings.port, reload=settings.debug, show=False, fastapi_app=app)
-        await logger.ainfo("ui.ready", prefix=settings.ui_prefix)
-    except Exception as e:
-        await logger.awarning("ui.error", error=str(e))
-
     await logger.ainfo("started", host=settings.host, port=settings.port, environment=settings.environment)
     yield
 
@@ -69,6 +55,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
+
+# Rota raiz - informações da API
+@app.get("/")
+async def root():
+    """Informações da API."""
+    return {
+        "name": settings.app_name,
+        "version": "0.1.0",
+        "docs": "/docs",
+        "api": "/api/v1/",
+        "dashboard": "Execute: uv run python -m app.main_with_ui",
+    }
 
 
 if __name__ == "__main__":
