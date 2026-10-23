@@ -82,14 +82,13 @@ setup_ui(settings.ui_prefix)
 logger.info("nicegui.pages.registered", prefix=settings.ui_prefix)
 
 
-if __name__ == "__main__":
-    logger.info("nicegui.starting", prefix=settings.ui_prefix)
-    
-    # Inicia o servidor NiceGUI
-    ui.run(
-        title=settings.app_name,
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
-        show=False,
-    )
+# Inicia o servidor NiceGUI (sem guard para permitir execução via uv run)
+logger.info("nicegui.starting", prefix=settings.ui_prefix)
+
+ui.run(
+    title=settings.app_name,
+    host=settings.host,
+    port=settings.port,
+    reload=settings.debug,
+    show=False,
+)
