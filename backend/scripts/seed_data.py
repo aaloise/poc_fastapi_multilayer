@@ -11,6 +11,12 @@ Uso:
     POC_ENV=production uv run python scripts/seed_data.py
 """
 
+import sys
+from pathlib import Path
+
+# Adiciona o diretório src ao path para importar os módulos
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 import asyncio
 import random
 import uuid

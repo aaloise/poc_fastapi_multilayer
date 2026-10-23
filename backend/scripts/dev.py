@@ -18,12 +18,16 @@ Comandos:
     shell       — Abre shell Python com contexto
 """
 
+import sys
+from pathlib import Path
+
+# Adiciona o diretório src ao path para importar os módulos
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 import argparse
 import asyncio
 import os
 import subprocess
-import sys
-from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
