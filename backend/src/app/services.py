@@ -1,7 +1,7 @@
 """Serviços — lógica de negócio."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 
@@ -33,7 +33,7 @@ async def execute_task(task_id: uuid.UUID) -> dict:
 
         # Mark as running
         task.status = TaskStatus.RUNNING
-        task.started_at = datetime.utcnow()
+        task.started_at = datetime.now(timezone.utc)
         task.attempts += 1
         await save_task(session, task)
 
@@ -43,7 +43,7 @@ async def execute_task(task_id: uuid.UUID) -> dict:
 
         # Mark as completed
         task.status = TaskStatus.COMPLETED
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(timezone.utc)
         await save_task(session, task)
 
     await logger.ainfo("task.completed", task_id=str(task_id))

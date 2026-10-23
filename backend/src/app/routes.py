@@ -1,7 +1,7 @@
 """FastAPI Routes — endpoints HTTP."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -68,6 +68,12 @@ async def list_tasks_endpoint(
     return [TaskResponse.from_task(t) for t in tasks]
 
 
+@router.get("/tasks/stats", response_model=dict)
+async def get_stats_endpoint() -> dict:
+    """Estatísticas."""
+    return await get_stats()
+
+
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
 async def get_task_endpoint(task_id: uuid.UUID) -> TaskResponse:
     """Busca task por ID."""
@@ -77,12 +83,6 @@ async def get_task_endpoint(task_id: uuid.UUID) -> TaskResponse:
     return TaskResponse.from_task(task)
 
 
-@router.get("/tasks/stats", response_model=dict)
-async def get_stats_endpoint() -> dict:
-    """Estatísticas."""
-    return await get_stats()
-
-
 @router.get("/health")
 async def health_check() -> dict:
     """Health check."""
@@ -90,7 +90,7 @@ async def health_check() -> dict:
     return {
         "status": "healthy",
         "version": "0.1.0",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "components": {
             "fastapi": True,
             "database": True,

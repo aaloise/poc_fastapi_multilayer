@@ -16,9 +16,7 @@ Uso:
 
 import asyncio
 import platform
-from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from nicegui import ui, app as nicegui_app
@@ -44,29 +42,6 @@ settings = get_settings()
 logger = structlog.get_logger()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Gerencia ciclo de vida: startup e shutdown."""
-    # Startup
-    await logger.ainfo("starting", uvloop=UVLOOP, environment=settings.environment)
-    
-    await init_db(settings.db_url)
-    await logger.ainfo("database.ready", url=settings.db_url)
-    
-    from app.database import _engine
-    await init_queue(_engine, settings.queue_concurrency)
-    await logger.ainfo("queue.ready")
-    
-    await logger.ainfo("started", host=settings.host, port=settings.port)
-    
-    yield
-    
-    # Shutdown
-    await stop_queue()
-    await close_db()
-    await logger.ainfo("stopped")
-
-
 # Configura NiceGUI app
 nicegui_app.add_middleware(
     CORSMiddleware,
@@ -78,8 +53,30 @@ nicegui_app.add_middleware(
 # Adiciona rotas da API ao NiceGUI
 nicegui_app.include_router(router)
 
-# Configura lifespan do NiceGUI
-nicegui_app.router.lifespan_context = lifespan
+
+# Startup event - inicializa banco e queue
+@nicegui_app.on_event("startup")
+async def startup_event():
+    """Inicializa banco e queue no startup."""
+    await logger.ainfo("starting", uvloop=UVLOOP, environment=settings.environment)
+    
+    await init_db(settings.db_url)
+    await logger.ainfo("database.ready", url=settings.db_url)
+    
+    from app.database import _engine
+    await init_queue(_engine, settings.queue_concurrency)
+    await logger.ainfo("queue.ready")
+    
+    await logger.ainfo("started", host=settings.host, port=settings.port)
+
+
+# Shutdown event - finaliza banco e queue
+@nicegui_app.on_event("shutdown")
+async def shutdown_event():
+    """Finaliza banco e queue no shutdown."""
+    await stop_queue()
+    await close_db()
+    await logger.ainfo("stopped")
 
 
 # Rota raiz - redireciona para dashboard

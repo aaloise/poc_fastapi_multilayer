@@ -1,7 +1,7 @@
 """Prefect Flows — orquestração de workflows (opcional)."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 
@@ -61,7 +61,7 @@ if PREFECT_OK:
             r = await fetch_data(f"item-{i}")
             results.append(r)
 
-        return {"processed": len(results), "at": datetime.utcnow().isoformat()}
+        return {"processed": len(results), "at": datetime.now(timezone.utc).isoformat()}
 
 else:
     # Stubs quando Prefect não está instalado

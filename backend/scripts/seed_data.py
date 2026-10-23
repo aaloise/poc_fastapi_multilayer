@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import asyncio
 import random
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -96,14 +96,14 @@ async def seed_database():
                 
                 # Adiciona timestamps
                 if task_obj.status == TaskStatus.RUNNING:
-                    task_obj.started_at = datetime.utcnow() - timedelta(minutes=random.randint(1, 30))
+                    task_obj.started_at = datetime.now(timezone.utc) - timedelta(minutes=random.randint(1, 30))
                 
                 if task_obj.status == TaskStatus.COMPLETED:
-                    task_obj.started_at = datetime.utcnow() - timedelta(minutes=random.randint(10, 60))
+                    task_obj.started_at = datetime.now(timezone.utc) - timedelta(minutes=random.randint(10, 60))
                     task_obj.completed_at = task_obj.started_at + timedelta(seconds=random.randint(1, 30))
                 
                 if task_obj.status == TaskStatus.FAILED:
-                    task_obj.started_at = datetime.utcnow() - timedelta(minutes=random.randint(5, 30))
+                    task_obj.started_at = datetime.now(timezone.utc) - timedelta(minutes=random.randint(5, 30))
                     task_obj.completed_at = task_obj.started_at + timedelta(seconds=random.randint(1, 10))
                     task_obj.attempts = random.randint(1, 3)
                 

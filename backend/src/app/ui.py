@@ -1,6 +1,6 @@
 """NiceGUI — Dashboard interativo."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from nicegui import ui
 
 # Importa services diretamente (sem HTTP)
@@ -18,7 +18,7 @@ def setup_ui(prefix: str = "/ui") -> None:
         with ui.header().classes("bg-gray-900 text-white"):
             ui.label("⚡ Async POC Dashboard").classes("text-xl font-bold")
             ui.space()
-            ui.label(datetime.utcnow().strftime("%H:%M:%S")).classes("text-sm")
+            ui.label(datetime.now(timezone.utc).strftime("%H:%M:%S")).classes("text-sm")
 
         with ui.row().classes("w-full gap-4 p-4"):
             with ui.card().classes("flex-1 p-4"):

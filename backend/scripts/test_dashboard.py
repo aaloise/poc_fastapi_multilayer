@@ -15,7 +15,7 @@ Uso:
 
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -57,7 +57,7 @@ class TestDashboard:
                 "success": result["success"],
                 "duration": duration,
                 "message": result["message"],
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
             
         except Exception as e:
@@ -70,7 +70,7 @@ class TestDashboard:
                 "success": False,
                 "duration": duration,
                 "message": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
     
     async def test_health(self, status_label, result_area):
