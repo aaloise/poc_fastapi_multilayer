@@ -24,7 +24,6 @@ if platform.system() != "Windows":
         pass
 
 from nicegui import ui, app as nicegui_app
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
@@ -40,27 +39,13 @@ settings = get_settings()
 logger = structlog.get_logger()
 
 
-# Cria o FastAPI app
-fastapi_app = FastAPI(title=settings.app_name, version="0.1.0")
-fastapi_app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-fastapi_app.include_router(router)
+# Configura o app do NiceGUI
+nicegui_app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+nicegui_app.include_router(router)
 
 
-# Rota raiz - redireciona para o dashboard
-@fastapi_app.get("/")
-async def root():
-    """Redireciona para o dashboard."""
-    return RedirectResponse(url="/ui/")
-
-
-# Configura as páginas do NiceGUI
-setup_ui(settings.ui_prefix)
-
-logger.info("nicegui.pages.registered", prefix=settings.ui_prefix)
-
-
-# Startup e shutdown
-@fastapi_app.on_event("startup")
+# Startup event
+@nicegui_app.on_event("startup")
 async def startup():
     """Inicializa banco e queue."""
     await logger.ainfo("starting", uvloop=UVLOOP, environment=settings.environment)
@@ -75,7 +60,8 @@ async def startup():
     await logger.ainfo("started", host=settings.host, port=settings.port)
 
 
-@fastapi_app.on_event("shutdown")
+# Shutdown event
+@nicegui_app.on_event("shutdown")
 async def shutdown():
     """Finaliza banco e queue."""
     await stop_queue()
@@ -83,13 +69,27 @@ async def shutdown():
     await logger.ainfo("stopped")
 
 
+# Rota raiz - redireciona para o dashboard
+@nicegui_app.get("/")
+async def root():
+    """Redireciona para o dashboard."""
+    return RedirectResponse(url="/ui/")
+
+
+# Configura as páginas do NiceGUI
+setup_ui(settings.ui_prefix)
+
+logger.info("nicegui.pages.registered", prefix=settings.ui_prefix)
+
+
 if __name__ == "__main__":
-    # Inicia com NiceGUI
+    logger.info("nicegui.starting", prefix=settings.ui_prefix)
+    
+    # Inicia o servidor NiceGUI
     ui.run(
         title=settings.app_name,
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
         show=False,
-        fastapi_app=fastapi_app,
     )
