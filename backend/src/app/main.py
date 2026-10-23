@@ -28,11 +28,11 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup e shutdown."""
-    await logger.ainfo("starting", uvloop=UVLOOP)
+    await logger.ainfo("starting", uvloop=UVLOOP, environment=settings.environment)
 
     # Startup
     await init_db(settings.db_url)
-    await logger.ainfo("database.ready")
+    await logger.ainfo("database.ready", url=settings.db_url)
 
     # Queuefy precisa do engine — vamos pegar do database module
     from app.database import _engine
@@ -43,13 +43,17 @@ async def lifespan(app: FastAPI):
     try:
         from nicegui import ui
         from app.ui import setup_ui
+        from scripts.test_dashboard import setup_test_dashboard
+        
         setup_ui(settings.ui_prefix)
-        ui.run(title="Async POC", port=settings.port, reload=settings.debug, show=False, fastapi_app=app)
+        setup_test_dashboard()
+        
+        ui.run(title=settings.app_name, port=settings.port, reload=settings.debug, show=False, fastapi_app=app)
         await logger.ainfo("ui.ready", prefix=settings.ui_prefix)
     except Exception as e:
         await logger.awarning("ui.error", error=str(e))
 
-    await logger.ainfo("started", host=settings.host, port=settings.port)
+    await logger.ainfo("started", host=settings.host, port=settings.port, environment=settings.environment)
     yield
 
     # Shutdown
@@ -65,9 +69,19 @@ app.include_router(router)
 
 
 if __name__ == "__main__":
+    # Verifica argumento --env
+    if "--env" in sys.argv:
+        env_index = sys.argv.index("--env")
+        if env_index + 1 < len(sys.argv):
+            import os
+            os.environ["POC_ENV"] = sys.argv[env_index + 1]
+            # Recarrega settings
+            from app.config import get_settings
+            settings = get_settings()
+    
     if "--granian" in sys.argv:
         from granian import Granian
-        Granian("app.main:app", address=settings.host, port=settings.port, interface="asgi", workers=4).serve()
+        Granian("app.main:app", address=settings.host, port=settings.port, interface="asgi", workers=settings.workers).serve()
     else:
         import uvicorn
         uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=settings.debug, loop="uvloop" if UVLOOP else "asyncio")

@@ -38,7 +38,7 @@ backend/
 
 ## 🚀 Quick Start
 
-### Com uv (recomendado)
+### Opção 1: Script de Desenvolvimento (Recomendado)
 
 ```bash
 cd backend
@@ -46,21 +46,54 @@ cd backend
 # Instala dependências
 uv sync
 
-# Desenvolvimento
+# Popula banco com dados de exemplo
+uv run python scripts/dev.py seed
+
+# Inicia API
+uv run python scripts/dev.py start
+
+# Em outro terminal, execute testes
+uv run python scripts/dev.py test
+```
+
+### Opção 2: Makefile
+
+```bash
+cd backend
+
+# Instala dependências
+make install
+
+# Popula banco
+make seed
+
+# Inicia API (dev)
+make dev
+
+# Em outro terminal
+make test-interactive  # Testes interativos
+make benchmark         # Benchmark de performance
+```
+
+### Opção 3: Manual
+
+```bash
+cd backend
+
+# Instala dependências
+uv sync
+
+# Desenvolvimento (SQLite)
 uv run python -m app.main
 
-# Produção (Granian + uvloop)
+# Produção (PostgreSQL)
+POC_ENV=production uv run python -m app.main
+
+# Granian (recomendado para produção)
 uv run granian --interface asgi --config granian.toml app.main:app
 ```
 
-### Com pip (fallback)
-
-```bash
-pip install -e .
-python -m app.main
-```
-
-### Docker
+### Opção 4: Docker
 
 ```bash
 docker-compose up -d
