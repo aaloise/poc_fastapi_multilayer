@@ -25,6 +25,7 @@ import structlog
 from app.config import get_settings
 from app.database import init_db, close_db
 from app.queue import init_queue, stop_queue
+from app.parallel import init_parallel, shutdown_parallel
 from app.routes import router
 from app.ui import setup_ui
 
@@ -54,10 +55,10 @@ nicegui_app.add_middleware(
 nicegui_app.include_router(router)
 
 
-# Startup event - inicializa banco e queue
+# Startup event - inicializa banco, queue e parallel
 @nicegui_app.on_event("startup")
 async def startup_event():
-    """Inicializa banco e queue no startup."""
+    """Inicializa banco, queue e parallel no startup."""
     await logger.ainfo("starting", uvloop=UVLOOP, environment=settings.environment)
     
     await init_db(settings.db_url)
@@ -67,13 +68,17 @@ async def startup_event():
     await init_queue(_engine, settings.queue_concurrency)
     await logger.ainfo("queue.ready")
     
+    init_parallel(n_jobs=-1)  # Usa todos os cores disponíveis
+    await logger.ainfo("parallel.ready")
+    
     await logger.ainfo("started", host=settings.host, port=settings.port)
 
 
-# Shutdown event - finaliza banco e queue
+# Shutdown event - finaliza banco, queue e parallel
 @nicegui_app.on_event("shutdown")
 async def shutdown_event():
-    """Finaliza banco e queue no shutdown."""
+    """Finaliza banco, queue e parallel no shutdown."""
+    shutdown_parallel()
     await stop_queue()
     await close_db()
     await logger.ainfo("stopped")
