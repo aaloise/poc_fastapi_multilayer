@@ -1,14 +1,14 @@
 [project]
 name = "async-poc"
 version = "0.1.0"
-description = "POC: FastAPI + uvloop + Granian + Prefect + Queuefy + NiceGUI — 100% Async"
+description = "POC: FastAPI + Granian + Prefect + Queuefy + NiceGUI — 100% Async"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
-    "uvloop>=0.20.0",
-    "granian[uvloop]>=1.6.0",
+    "uvloop>=0.20.0; sys_platform != 'win32'",
+    "granian>=1.6.0",
     "nicegui>=2.0",
     "queuefy[sqlalchemy]>=1.0.3",
     "sqlalchemy[asyncio]>=2.0",

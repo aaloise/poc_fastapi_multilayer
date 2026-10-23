@@ -2,19 +2,22 @@
 
 import asyncio
 import sys
+import platform
 from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# uvloop
-try:
-    import uvloop
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-    UVLOOP = True
-except ImportError:
-    UVLOOP = False
+# uvloop - não funciona no Windows
+UVLOOP = False
+if platform.system() != "Windows":
+    try:
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        UVLOOP = True
+    except ImportError:
+        pass
 
 from app.config import get_settings
 from app.database import init_db, close_db

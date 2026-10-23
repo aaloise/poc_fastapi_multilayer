@@ -86,6 +86,7 @@ async def get_stats_endpoint() -> dict:
 @router.get("/health")
 async def health_check() -> dict:
     """Health check."""
+    from app.main import UVLOOP
     return {
         "status": "healthy",
         "version": "0.1.0",
@@ -96,7 +97,7 @@ async def health_check() -> dict:
             "queuefy": True,
             "prefect": PREFECT_OK,
             "nicegui": True,
-            "uvloop": True,
+            "uvloop": UVLOOP,
         },
     }
 
