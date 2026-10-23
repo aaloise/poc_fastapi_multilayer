@@ -46,8 +46,7 @@ Se você está executando pela primeira vez ou encontrou erros de `ModuleNotFoun
 cd backend
 
 # Remove ambiente virtual antigo (se existir)
-rm -rf .venv  # Linux/macOS
-# ou no Windows PowerShell:
+# Windows PowerShell:
 Remove-Item -Recurse -Force .venv
 
 # Reinstala dependências
@@ -57,22 +56,54 @@ uv sync
 uv run python scripts/verify_setup.py
 ```
 
-### Opção 1: Script de Desenvolvimento (Recomendado)
+### 🎯 Escolha seu Modo de Execução
+
+A POC pode ser executada em **dois modos**:
+
+#### 1️⃣ API Pura (Recomendado para desenvolvimento)
+
+```bash
+# Inicia apenas a API REST
+uv run python -m app.main
+
+# Acesse:
+# - API: http://localhost:8000/api/v1/
+# - Docs: http://localhost:8000/docs
+# - Dashboard React: Abra dist/index.html no navegador
+```
+
+#### 2️⃣ API + Dashboard NiceGUI (Para demonstração visual)
+
+```bash
+# Inicia API com dashboard integrado
+uv run python -m app.main_with_ui
+
+# Acesse:
+# - Dashboard: http://localhost:8000/ui/
+# - API: http://localhost:8000/api/v1/
+# - Docs: http://localhost:8000/docs
+```
+
+📖 **Leia mais em [RUN_MODES.md](RUN_MODES.md)**
+
+### 📝 Workflow Completo
 
 ```bash
 cd backend
 
-# Instala dependências (se ainda não instalou)
+# 1. Instala dependências
 uv sync
 
-# Popula banco com dados de exemplo
-uv run python scripts/dev.py seed
+# 2. Popula banco com dados de exemplo
+uv run python scripts/seed_data.py
 
-# Inicia API
-uv run python scripts/dev.py start
+# 3. Inicia API (escolha um modo)
+uv run python -m app.main              # API pura
+# OU
+uv run python -m app.main_with_ui      # API + Dashboard NiceGUI
 
-# Em outro terminal, execute testes
-uv run python scripts/dev.py test
+# 4. Em outro terminal, execute testes
+uv run python scripts/test_interactive.py
 ```
 
 ### Opção 2: Makefile
