@@ -38,12 +38,31 @@ backend/
 
 ## 🚀 Quick Start
 
+### ⚠️ Importante: Configuração Inicial
+
+Se você está executando pela primeira vez ou encontrou erros de `ModuleNotFoundError`, execute:
+
+```bash
+cd backend
+
+# Remove ambiente virtual antigo (se existir)
+rm -rf .venv  # Linux/macOS
+# ou no Windows PowerShell:
+Remove-Item -Recurse -Force .venv
+
+# Reinstala dependências
+uv sync
+
+# Verifica se tudo está configurado corretamente
+uv run python scripts/verify_setup.py
+```
+
 ### Opção 1: Script de Desenvolvimento (Recomendado)
 
 ```bash
 cd backend
 
-# Instala dependências
+# Instala dependências (se ainda não instalou)
 uv sync
 
 # Popula banco com dados de exemplo
