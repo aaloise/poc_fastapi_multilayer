@@ -353,7 +353,7 @@ prefect server start
 ### Docker
 
 ```bash
-docker run -p 4200:4200 prefecthq/prefect:3-python3.13
+docker run -p 4200:4200 prefecthq/prefect:3-python3.14
 ```
 
 ### Configuração
@@ -530,7 +530,7 @@ prefect deployment apply deployment.yaml
 version: '3'
 services:
   prefect:
-    image: prefecthq/prefect:3-python3.13
+    image: prefecthq/prefect:3-python3.14
     ports:
       - "4200:4200"
     environment:

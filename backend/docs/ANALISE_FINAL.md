@@ -134,7 +134,7 @@
 backend/
 ├── 10+ arquivos .md redundantes
 ├── Dashboard React (desnecessário)
-├── Dois entry points (main.py, main_with_ui.py)
+├── Dois entry points (main.py, main_with_ui.py) - REMOVIDO
 └── Documentação espalhada
 ```
 

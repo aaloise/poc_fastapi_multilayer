@@ -119,7 +119,7 @@ services:
 
   # Optional: Prefect server
   prefect:
-    image: prefecthq/prefect:3-python3.13
+    image: prefecthq/prefect:3-python3.14
     ports:
       - "4200:4200"
     environment:

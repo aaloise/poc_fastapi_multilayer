@@ -112,6 +112,7 @@ backend/src/app/
 ├── routes.py        # FastAPI routes
 ├── ui.py            # NiceGUI pages
 ├── queue.py         # Queuefy integration
+├── parallel.py      # Joblib (CPU-bound tasks)
 ├── flows.py         # Prefect flows
 └── database.py      # DB setup
                 """).classes("w-full")
