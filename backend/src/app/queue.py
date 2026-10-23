@@ -193,11 +193,11 @@ async def enqueue_at(task_name: str, when, **kwargs) -> str:
         **kwargs: Argumentos para o handler
     
     Exemplo:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         
         # Rodar daqui a 1 hora
         await enqueue_at("process_task", 
-                        when=datetime.utcnow() + timedelta(hours=1),
+                        when=datetime.now(timezone.utc) + timedelta(hours=1),
                         task_id="789",
                         payload={"scheduled": True})
     """

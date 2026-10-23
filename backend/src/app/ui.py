@@ -1,7 +1,11 @@
 """NiceGUI — Dashboard interativo."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from nicegui import ui
+
+# Importa services diretamente (sem HTTP)
+from app.services import create_task, get_all_tasks, get_stats
+from app.models import Priority
 
 
 def setup_ui(prefix: str = "/ui") -> None:
@@ -14,7 +18,7 @@ def setup_ui(prefix: str = "/ui") -> None:
         with ui.header().classes("bg-gray-900 text-white"):
             ui.label("⚡ Async POC Dashboard").classes("text-xl font-bold")
             ui.space()
-            ui.label(datetime.utcnow().strftime("%H:%M:%S")).classes("text-sm")
+            ui.label(datetime.now(timezone.utc).strftime("%H:%M:%S")).classes("text-sm")
 
         with ui.row().classes("w-full gap-4 p-4"):
             with ui.card().classes("flex-1 p-4"):
@@ -41,17 +45,12 @@ def setup_ui(prefix: str = "/ui") -> None:
 
             async def on_create():
                 try:
-                    import httpx
-                    async with httpx.AsyncClient() as client:
-                        resp = await client.post(
-                            "http://localhost:8000/api/v1/tasks",
-                            json={"name": name_input.value, "priority": priority.value},
-                        )
-                        if resp.status_code == 201:
-                            data = resp.json()
-                            result.text = f"✅ Created: {data['id'][:8]}..."
-                        else:
-                            result.text = f"❌ Error: {resp.text}"
+                    # Chama service diretamente (sem HTTP)
+                    task = await create_task(
+                        name=name_input.value,
+                        priority=Priority(priority.value)
+                    )
+                    result.text = f"✅ Created: {str(task.id)[:8]}..."
                 except Exception as e:
                     result.text = f"❌ {e}"
 
@@ -73,21 +72,17 @@ def setup_ui(prefix: str = "/ui") -> None:
 
         async def refresh():
             try:
-                import httpx
-                async with httpx.AsyncClient() as client:
-                    resp = await client.get("http://localhost:8000/api/v1/tasks?limit=10")
-                    if resp.status_code == 200:
-                        tasks = resp.json()
-                        table.rows = [
-                            {"id": t["id"][:8], "name": t["name"], "status": t["status"], "priority": t["priority"]}
-                            for t in tasks
-                        ]
-                        table.update()
+                # Chama services diretamente (sem HTTP)
+                tasks = await get_all_tasks(limit=10)
+                table.rows = [
+                    {"id": str(t.id)[:8], "name": t.name, "status": t.status, "priority": t.priority}
+                    for t in tasks
+                ]
+                table.update()
 
-                    stats_resp = await client.get("http://localhost:8000/api/v1/tasks/stats")
-                    if stats_resp.status_code == 200:
-                        s = stats_resp.json()
-                        stats.text = f"Total: {s['total']} | Pending: {s['pending']} | Done: {s['completed']}"
+                # Atualiza estatísticas
+                s = await get_stats()
+                stats.text = f"Total: {s['total']} | Pending: {s['pending']} | Done: {s['completed']}"
             except Exception as e:
                 stats.text = f"Error: {e}"
 
@@ -117,6 +112,7 @@ backend/src/app/
 ├── routes.py        # FastAPI routes
 ├── ui.py            # NiceGUI pages
 ├── queue.py         # Queuefy integration
+├── parallel.py      # Joblib (CPU-bound tasks)
 ├── flows.py         # Prefect flows
 └── database.py      # DB setup
                 """).classes("w-full")

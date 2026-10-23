@@ -1,404 +1,177 @@
-# Async POC — FastAPI + Granian + Queuefy + NiceGUI
+# Async POC
 
-POC 100% async com estrutura simples e direta, usando **uv** para gerenciamento de dependências.
+POC com FastAPI + Granian + Queuefy + NiceGUI + Joblib + Prefect. Tudo async, arquitetura flat.
+
+## 🚀 Quick Start
+
+```bash
+cd backend
+
+# 1. Instalar dependências
+uv sync
+
+# 2. Popular banco
+uv run python scripts/seed_data.py
+
+# 3. Iniciar aplicação
+uv run python -m app.main
+```
+
+**Acesse:**
+- Dashboard: http://localhost:8000/ui/
+- API: http://localhost:8000/api/v1/
+- Docs: http://localhost:8000/docs
+
+## 📦 Stack
+
+| Tecnologia | Função | Tipo |
+|-----------|--------|------|
+| **FastAPI** | API REST | I/O-bound (async) |
+| **Granian** | Servidor ASGI (Rust) | Server |
+| **uvloop** | Event loop rápido | Runtime |
+| **NiceGUI** | Dashboard visual | UI |
+| **Queuefy** | Task queue | I/O-bound (async) |
+| **Joblib** | Processamento paralelo | CPU-bound (parallel) |
+| **Prefect** | Orquestração de workflows | Orchestration |
+| **SQLAlchemy** | ORM async | Database |
+
+## 🏗️ Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              main.py (único processo)                    │
+│                                                          │
+│  ┌──────────────┐    ┌──────────────┐                   │
+│  │   NiceGUI    │    │   FastAPI    │                   │
+│  │   (UI)       │    │   (API REST) │                   │
+│  └──────┬───────┘    └──────┬───────┘                   │
+│         │                   │                            │
+│         └────────┬──────────┘                            │
+│                  │                                       │
+│                  ↓                                       │
+│         ┌────────────────┐                              │
+│         │   services.py  │                              │
+│         │  (Business)    │                              │
+│         └────────┬───────┘                              │
+│                  │                                       │
+│         ┌────────┼────────┬──────────┐                 │
+│         │        │        │          │                 │
+│         ↓        ↓        ↓          ↓                 │
+│  ┌──────────┐ ┌──────┐ ┌──────┐ ┌──────────┐         │
+│  │database  │ │queue │ │joblib│ │ prefect  │         │
+│  │(SQLA)    │ │(Qfy) │ │(CPU) │ │ (flows)  │         │
+│  └──────────┘ └──────┘ └──────┘ └──────────┘         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Quando usar cada componente?
+
+| Componente | Use para | Exemplo |
+|-----------|----------|---------|
+| **Queuefy** | I/O-bound, async | API calls, DB queries, file I/O |
+| **Joblib** | CPU-bound, parallel | ML training, data processing, cálculos pesados |
+| **Prefect** | Workflows complexos | ETL pipelines, orquestração multi-step |
 
 ## 📁 Estrutura
 
 ```
 backend/
-├── pyproject.toml      # uv + dependências
-├── granian.toml        # Config do servidor
-├── Makefile            # Comandos úteis
-├── Dockerfile          # Container
-├── docker-compose.yml  # Stack completa
-│
 ├── src/app/
-│   ├── main.py         # 🚀 Entry point + lifespan
-│   ├── config.py       # ⚙️ Settings (pydantic)
-│   ├── models.py       # 📦 Domain + DB models (tabela: tasks)
-│   ├── services.py     # ⚙️ Business logic
-│   ├── routes.py       # 🔌 FastAPI routes
-│   ├── ui.py           # 🎨 NiceGUI pages
-│   ├── queue.py        # 📊 Queuefy (tabelas: queuefy_*)
-│   ├── flows.py        # 🔮 Prefect flows
-│   └── database.py     # 🗄️ DB setup
+│   ├── main.py          # Entry point (API + UI + Queue + Parallel)
+│   ├── config.py        # Configurações multi-ambiente
+│   ├── models.py        # Domain + DB models
+│   ├── services.py      # Business logic
+│   ├── routes.py        # API endpoints
+│   ├── ui.py            # NiceGUI dashboard
+│   ├── queue.py         # Queuefy (I/O-bound tasks)
+│   ├── parallel.py      # Joblib (CPU-bound tasks)
+│   ├── flows.py         # Prefect (workflows)
+│   └── database.py      # DB setup
 │
-└── docs/               # 📚 Documentação completa
-    ├── ARCHITECTURE.md # Arquitetura e design
-    ├── GRANIAN.md      # Servidor ASGI
-    ├── FASTAPI.md      # Framework HTTP
-    ├── NICEGUI.md      # Interface web
-    ├── PREFECT.md      # Orquestração
-    ├── SERVICES.md     # Lógica de negócio
-    ├── DATABASE.md     # Modelo de banco
-    ├── QUEUEFY.md      # Fila de tarefas
-    ├── DEPLOYMENT.md   # Guia de deploy
-    └── TESTING.md      # Guia de testes
+├── scripts/
+│   ├── seed_data.py     # Popula banco
+│   ├── test_interactive.py  # Testes
+│   └── benchmark.py     # Performance
+│
+├── tests/               # Testes unitários
+├── docs/                # Documentação detalhada
+├── pyproject.toml       # Dependências (Python 3.14+)
+└── README.md            # Este arquivo
 ```
 
-## 🚀 Quick Start
-
-### ⚠️ Importante: Configuração Inicial
-
-Se você está executando pela primeira vez ou encontrou erros de `ModuleNotFoundError`, execute:
+## 🧪 Testar
 
 ```bash
-cd backend
-
-# Remove ambiente virtual antigo (se existir)
-# Windows PowerShell:
-Remove-Item -Recurse -Force .venv
-
-# Reinstala dependências
-uv sync
-
-# Verifica se tudo está configurado corretamente
-uv run python scripts/verify_setup.py
-```
-
-### 🎯 Escolha seu Modo de Execução
-
-A POC pode ser executada em **dois modos**:
-
-#### 1️⃣ API Pura (Recomendado para desenvolvimento)
-
-```bash
-# Inicia apenas a API REST
-uv run python -m app.main
-
-# Acesse:
-# - API: http://localhost:8000/api/v1/
-# - Docs: http://localhost:8000/docs
-# - Dashboard React: Abra dist/index.html no navegador
-```
-
-#### 2️⃣ API + Dashboard NiceGUI (Para demonstração visual)
-
-```bash
-# Inicia API com dashboard integrado
-uv run python -m app.main_with_ui
-
-# Acesse:
-# - Dashboard: http://localhost:8000/ui/
-# - API: http://localhost:8000/api/v1/
-# - Docs: http://localhost:8000/docs
-```
-
-📖 **Leia mais em [RUN_MODES.md](RUN_MODES.md)**
-
-### 📝 Workflow Completo
-
-```bash
-cd backend
-
-# 1. Instala dependências
-uv sync
-
-# 2. Popula banco com dados de exemplo
-uv run python scripts/seed_data.py
-
-# 3. Inicia API (escolha um modo)
-uv run python -m app.main              # API pura
-# OU
-uv run python -m app.main_with_ui      # API + Dashboard NiceGUI
-
-# 4. Em outro terminal, execute testes
+# Testes interativos
 uv run python scripts/test_interactive.py
-```
 
-### Opção 2: Makefile
+# Benchmark
+uv run python scripts/benchmark.py
 
-```bash
-cd backend
-
-# Instala dependências
-make install
-
-# Popula banco
-make seed
-
-# Inicia API (dev)
-make dev
-
-# Em outro terminal
-make test-interactive  # Testes interativos
-make benchmark         # Benchmark de performance
-```
-
-### Opção 3: Manual
-
-```bash
-cd backend
-
-# Instala dependências
-uv sync
-
-# Desenvolvimento (SQLite)
-uv run python -m app.main
-
-# Produção (PostgreSQL)
-POC_ENV=production uv run python -m app.main
-
-# Granian (recomendado para produção)
-uv run granian --interface asgi --config granian.toml app.main:app
-```
-
-### Opção 4: Docker
-
-```bash
-docker-compose up -d
-```
-
-## 🌐 Endpoints
-
-- **API**: http://localhost:8000/api/v1/
-- **Dashboard**: http://localhost:8000/ui/
-- **Docs**: http://localhost:8000/docs
-
-## 📚 Documentação
-
-### Core
-
-- [🏗️ ARCHITECTURE.md](docs/ARCHITECTURE.md) — Arquitetura flat e design
-- [⚙️ SERVICES.md](docs/SERVICES.md) — Lógica de negócio
-- [📦 DATABASE.md](docs/DATABASE.md) — Modelo de banco de dados
-- [📊 QUEUEFY.md](docs/QUEUEFY.md) — Fila de tarefas async
-
-### Tecnologias
-
-- [🦀 GRANIAN.md](docs/GRANIAN.md) — Servidor ASGI em Rust
-- [⚡ FASTAPI.md](docs/FASTAPI.md) — Framework HTTP async
-- [🎨 NICEGUI.md](docs/NICEGUI.md) — Interface web interativa
-- [🔮 PREFECT.md](docs/PREFECT.md) — Orquestração de workflows
-
-### Operações
-
-- [🚀 DEPLOYMENT.md](docs/DEPLOYMENT.md) — Guia de deploy
-- [🧪 TESTING.md](docs/TESTING.md) — Guia de testes
-
-## 📊 Como Funciona
-
-### Fluxo de Execução
-
-```
-1. API recebe request
-   POST /api/v1/tasks
-   ↓
-2. Cria task no banco (tabela: tasks)
-   status: pending
-   ↓
-3. Enfileira no Queuefy (tabela: queuefy_runs)
-   status: pending
-   ↓
-4. Worker em background busca tasks pendentes
-   ↓
-5. Executa o handler registrado
-   ↓
-6. Atualiza status para completed/failed
-```
-
-### Tabelas no Banco
-
-- **`tasks`** — Suas tasks de negócio
-- **`queuefy_runs`** — Execuções do Queuefy (auto-criada)
-- **`queuefy_schedules`** — Cron jobs (auto-criada)
-
-## 📦 Stack
-
-| Tecnologia | Função | Documentação |
-|-----------|--------|--------------|
-| **FastAPI** | Framework HTTP async | [FASTAPI.md](docs/FASTAPI.md) |
-| **uvloop** | Event loop ultra-rápido | [GRANIAN.md](docs/GRANIAN.md) |
-| **Granian** | Servidor ASGI em Rust | [GRANIAN.md](docs/GRANIAN.md) |
-| **Queuefy** | Fila async (sem broker) | [QUEUEFY.md](docs/QUEUEFY.md) |
-| **Prefect** | Orquestração (opcional) | [PREFECT.md](docs/PREFECT.md) |
-| **NiceGUI** | UI interativa | [NICEGUI.md](docs/NICEGUI.md) |
-| **SQLAlchemy** | ORM async | [DATABASE.md](docs/DATABASE.md) |
-
-## 🔄 Arquitetura
-
-```
-┌─────────────────────────────────────────┐
-│         Granian (Rust) + uvloop         │
-└────────────────┬────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│         FastAPI (routes.py)             │
-└────────────────┬────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│      Services (services.py)             │
-│      Business Logic                     │
-└────────────────┬────────────────────────┘
-                 │
-        ┌────────┴────────┐
-        │                 │
-        ▼                 ▼
-┌──────────────┐  ┌──────────────┐
-│  Database    │  │   Queuefy    │
-│  (models.py) │  │  (queue.py)  │
-└──────────────┘  └──────────────┘
-```
-
-**📖 [Leia mais em ARCHITECTURE.md](docs/ARCHITECTURE.md)**
-
-## 🧪 Testes
-
-```bash
-# Todos os testes
+# Testes unitários
 uv run pytest tests/ -v
-
-# Com coverage
-uv run pytest --cov=src/app --cov-report=term-missing
 ```
 
-**📖 [Leia mais em TESTING.md](docs/TESTING.md)**
+## 📊 Endpoints
 
-## 📝 Comandos (Makefile)
+### API REST
+- `POST /api/v1/tasks` - Criar task
+- `GET /api/v1/tasks` - Listar tasks
+- `GET /api/v1/tasks/{id}` - Buscar task
+- `GET /api/v1/tasks/stats` - Estatísticas
+- `GET /api/v1/health` - Health check
 
+### Processamento Paralelo
+- `POST /api/v1/parallel/compute` - Computação paralela (Joblib)
+
+### Workflows
+- `POST /api/v1/flows/pipeline` - Pipeline ETL (Prefect)
+- `POST /api/v1/flows/batch` - Batch process (Prefect)
+
+## 🐍 Python 3.14+
+
+Esta POC usa **Python 3.14** (lançado em outubro de 2025) ou superior.
+
+**Novidades do Python 3.14:**
+- Template string literals
+- Deferred evaluation of annotations
+- Suporte a free-threaded Python (no GIL)
+
+**Python 3.15** (outubro de 2026):
+- Lazy imports
+- `frozendict` e `sentinel` builtins
+- UTF-8 mode por padrão
+
+## 📖 Documentação
+
+- `docs/ARCHITECTURE.md` - Arquitetura
+- `docs/QUEUEFY.md` - Queuefy (I/O-bound)
+- `docs/JOBLIB.md` - Joblib (CPU-bound)
+- `docs/PREFECT.md` - Prefect (workflows)
+- `docs/DATABASE.md` - Modelo de banco
+- `docs/FASTAPI.md` - FastAPI
+- `docs/NICEGUI.md` - NiceGUI
+- `docs/GRANIAN.md` - Granian
+- `docs/TESTING.md` - Testes
+- `docs/DEPLOYMENT.md` - Deploy
+
+## 🐛 Troubleshooting
+
+**ModuleNotFoundError:**
 ```bash
-make install      # uv sync
-make dev          # Rodar em dev
-make granian      # Rodar com Granian
-make test         # Testes
-make lint         # Linting
-make docker-up    # Docker
+uv sync
 ```
 
-## 🔧 Configuração
-
-### Variáveis de Ambiente
-
+**Porta em uso:**
 ```bash
-# .env
-POC_APP_NAME=Async POC
-POC_DEBUG=false
-POC_HOST=0.0.0.0
-POC_PORT=8000
-POC_DB_URL=sqlite+aiosqlite:///./poc.db
-POC_QUEUE_CONCURRENCY=8
-POC_UI_PREFIX=/ui
+# Windows
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# Linux/Mac
+lsof -ti:8000 | xargs kill -9
 ```
 
-Copie `.env.example` para `.env` e customize.
-
-## 🚀 Deploy
-
-### Docker
-
-```bash
-docker build -t async-poc .
-docker run -p 8000:8000 async-poc
-```
-
-### Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-### Kubernetes
-
-```bash
-kubectl apply -f k8s/
-```
-
-**📖 [Leia mais em DEPLOYMENT.md](docs/DEPLOYMENT.md)**
-
-## 💡 Exemplos de Uso
-
-### Criar Task
-
-```python
-# Via API
-POST /api/v1/tasks
-{
-    "name": "send_email",
-    "payload": {"to": "user@example.com"},
-    "priority": "high"
-}
-
-# Via código
-from app.services import create_task
-
-task = await create_task(
-    name="send_email",
-    payload={"to": "user@example.com"},
-    priority=Priority.HIGH
-)
-```
-
-### Task Agendada
-
-```python
-from datetime import datetime, timedelta
-from app.queue import enqueue_at
-
-# Rodar daqui a 1 hora
-await enqueue_at(
-    "send_notification",
-    when=datetime.utcnow() + timedelta(hours=1),
-    message="Hello!",
-    channel="email"
-)
-```
-
-### Cron Job
-
-```python
-# queue.py
-@_queuefy.task("daily_report", cron="0 4 * * *")
-async def handle_daily_report():
-    """Roda todo dia às 4h da manhã."""
-    stats = await get_stats()
-    return {"report": stats}
-```
-
-## 📖 Links Úteis
-
-### Documentação Interna
-
-- [Arquitetura](docs/ARCHITECTURE.md)
-- [Serviços](docs/SERVICES.md)
-- [Banco de Dados](docs/DATABASE.md)
-- [Queuefy](docs/QUEUEFY.md)
-- [Granian](docs/GRANIAN.md)
-- [FastAPI](docs/FASTAPI.md)
-- [NiceGUI](docs/NICEGUI.md)
-- [Prefect](docs/PREFECT.md)
-- [Deploy](docs/DEPLOYMENT.md)
-- [Testes](docs/TESTING.md)
-
-### Documentação Externa
-
-- [Queuefy no GitHub](https://github.com/paulocoutinhox/queuefy)
-- [Granian no GitHub](https://github.com/emmett-framework/granian)
-- [FastAPI Docs](https://fastapi.tiangolo.com/)
-- [NiceGUI Docs](https://nicegui.io/documentation)
-- [Prefect Docs](https://docs.prefect.io/)
-- [uv Docs](https://docs.astral.sh/uv/)
-
-## 🤝 Contribuindo
-
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/amazing-feature`)
-3. Commit suas mudanças (`git commit -m 'Add amazing feature'`)
-4. Push para a branch (`git push origin feature/amazing-feature`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-MIT License - veja o arquivo LICENSE para detalhes.
-
-## 📞 Suporte
-
-Para dúvidas e sugestões:
-- Abra uma issue no GitHub
-- Consulte a documentação em `docs/`
-- Veja os exemplos de código em `src/app/`
-
----
-
-**Desenvolvido com ❤️ usando FastAPI + Granian + Queuefy + NiceGUI**
+**Windows:**
+- uvloop não funciona (usa asyncio automaticamente)
+- Tudo funciona normalmente

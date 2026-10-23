@@ -1,7 +1,7 @@
 """FastAPI Routes — endpoints HTTP."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.models import Task, TaskStatus, Priority
 from app.services import create_task, get_task_by_id, get_all_tasks, get_stats
 from app.flows import data_pipeline, batch_process, PREFECT_OK
+from app.parallel import parallel_map, heavy_computation
 
 router = APIRouter(prefix="/api/v1", tags=["tasks"])
 
@@ -68,6 +69,12 @@ async def list_tasks_endpoint(
     return [TaskResponse.from_task(t) for t in tasks]
 
 
+@router.get("/tasks/stats", response_model=dict)
+async def get_stats_endpoint() -> dict:
+    """Estatísticas."""
+    return await get_stats()
+
+
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
 async def get_task_endpoint(task_id: uuid.UUID) -> TaskResponse:
     """Busca task por ID."""
@@ -77,12 +84,6 @@ async def get_task_endpoint(task_id: uuid.UUID) -> TaskResponse:
     return TaskResponse.from_task(task)
 
 
-@router.get("/tasks/stats", response_model=dict)
-async def get_stats_endpoint() -> dict:
-    """Estatísticas."""
-    return await get_stats()
-
-
 @router.get("/health")
 async def health_check() -> dict:
     """Health check."""
@@ -90,7 +91,7 @@ async def health_check() -> dict:
     return {
         "status": "healthy",
         "version": "0.1.0",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "components": {
             "fastapi": True,
             "database": True,
@@ -116,3 +117,34 @@ async def run_batch(size: int = Query(10, ge=1, le=100)) -> dict:
     if not PREFECT_OK:
         raise HTTPException(503, "Prefect not available")
     return await batch_process(size)
+
+
+@router.post("/parallel/compute")
+async def run_parallel_computation(
+    items: int = Query(100, ge=1, le=10000),
+    n_jobs: int = Query(-1, ge=-1),
+) -> dict:
+    """
+    Executa computação paralela com Joblib.
+    
+    Útil para tarefas CPU-bound (cálculos pesados, ML, etc).
+    """
+    import time
+    start = time.perf_counter()
+    
+    # Executa computação pesada em paralelo
+    results = await parallel_map(
+        heavy_computation,
+        list(range(items)),
+        n_jobs=n_jobs,
+    )
+    
+    duration = time.perf_counter() - start
+    
+    return {
+        "items": items,
+        "n_jobs": n_jobs,
+        "results": len(results),
+        "duration_seconds": round(duration, 3),
+        "throughput": round(items / duration, 2),
+    }

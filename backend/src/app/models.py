@@ -14,7 +14,7 @@ Tabelas criadas no banco:
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -57,7 +57,7 @@ class Task(BaseModel):
     priority: Priority = Priority.MEDIUM         # Prioridade
     queue: str = "default"                       # Fila (para organização)
     attempts: int = 0                            # Quantas vezes tentou processar
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: datetime | None = None           # Quando começou a processar
     completed_at: datetime | None = None         # Quando terminou
     error: str | None = None                     # Mensagem de erro (se falhou)
@@ -110,7 +110,7 @@ class TaskRow(Base):
     )
     queue: Mapped[str] = mapped_column(String(100), default="default", comment="Nome da fila")
     attempts: Mapped[int] = mapped_column(Integer, default=0, comment="Número de tentativas")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, comment="Quando foi criada")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), comment="Quando foi criada")
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="Quando começou a processar")
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="Quando terminou")
     error: Mapped[str | None] = mapped_column(String(1000), nullable=True, comment="Mensagem de erro")
@@ -175,9 +175,10 @@ async def save_task(session: AsyncSession, task: Task) -> Task:
         session.add(row)
     
     await session.commit()
-    await session.refresh(row if existing else row)
+    target = existing if existing else row
+    await session.refresh(target)
     
-    return (existing or row).to_task()
+    return target.to_task()
 
 
 async def get_task(session: AsyncSession, task_id: uuid.UUID) -> Task | None:
